@@ -2,27 +2,16 @@ import nds2
 from log import Logger
 from gwpy.time import tconvert
 from numpy.random import randint
-
+from collections import OrderedDict
 __author__ = 'mikelovskij'
 
 # TODO: implement a timeout routine?
+
 
 class NdsTester(object):
     def __init__(self, logger=Logger):
         self.logger = logger('NDS tester')
         self.gpsb = int(tconvert('now') - 1200)
-
-    def connect_iterator(self, serv):
-        for ifo, s in serv.iteritems:
-            self.logger.info('Testing connection to server at {0} ({1})...'.format(ifo, s))
-            try:
-                conn = nds2.connection(s)
-                self.logger.success('Connection establilished, printing details... \n {0}'.format(conn))
-            except:
-                self.logger.error("""Unable to open connection with server... \n {0},'
-                                   the test will skip this server""".format(s))
-                continue
-            yield conn
 
     def connection_tester(self, ifo, s):
         self.logger.info('Testing connection to server at {0} ({1})...'.format(ifo, s))
@@ -48,10 +37,34 @@ class NdsTester(object):
     def iterator_tester(self, it):
         try:
             self.logger.info('Attempting to iterate on the generated iterator')
-            data = next(it)
+            data = it.next()
             self.logger.success('Iteration success: data = {0}'. format(data))
+            return True
         except Exception as e:
             self.logger.error('Error {1} encountered while attempting to iterate on the iterator {0}'.format(it, e))
+            return False
+
+    def resultlogger(self, rdict, logfile='log.txt'):
+        f = open(logfile, 'a')
+        f.write('Test completed at time {0}\n'.format(tconvert('now')))
+        for serv, keys in rdict.iteritems():
+            f.write('server: [{0}]\n'.format(serv))
+            f.write('All connection attempts Succeeded : {0}\n'.format(keys.pop('connection', True)))
+            f.write('{0:<35}\t{1:<25}\t{2:<25}\t{3:<25}\t{4:<25}\t{5:<25}\n'.format(
+                'Channel', 'Avail. than. list tetr.',
+                'Offline_iterator_created','Offline_iteration_succeeded',
+                'Online_iterator_created','Online_iteration_succeeded'))
+            for chan, tests in keys.iteritems():
+                string = '{0:<35}\t{1:<25}\t{2:<25}\t{3:<25}\t{4:<25}\t{5:<25}\n'.format(
+                    chan, tests.pop('available', False),
+                    tests.pop('OfflineIteratorCreation', True), tests.pop('OfflineIterationTest', True),
+                    tests.pop('OnlineIteratorCreation', True), tests.pop('OnlineIterationTest', True))
+                f.write(string)
+            f.write('\n')
+        f.write('\n')
+        f.close()
+
+
 
     def tester(self, testchannels=[], servers=None, gpsb=None, gpse=None, stride=5, nrand=10, avail_check=True):
         """
@@ -93,8 +106,10 @@ class NdsTester(object):
             boolean, indicates whether or not the available online channels for a servers are requested. This process
             could require a lot of time.
             default = True
+        :returns resultdict `OrderedDict` :
+            the function returns a nested dictionary in which the results for each server and channels are stored.
         """
-
+        resultdict = OrderedDict()
         if servers is None:
             servers = {'nds.ligo-la.caltech.edu': 'L1', 'nds.ligo-wa.caltech.edu': 'H1'}
         if gpsb is None:
@@ -102,10 +117,12 @@ class NdsTester(object):
         if gpse is None:
             gpse = gpsb + 600
         for interf, serv in servers.iteritems():
+            servresdict = OrderedDict()
             # attempt to connect to the nds server
             connection = self.connection_tester(interf, serv)
             if isinstance(connection, Exception):
                 self.logger.info('The test will skip this server')
+                servresdict['connection'] = False
                 continue
             # retrieve the list of available online channels on this server
             if avail_check:
@@ -119,9 +136,12 @@ class NdsTester(object):
             else:
                 random_channels = []
                 avail_channels = []
-            for c in set(testchannels + random_channels):
+            chdict = OrderedDict.fromkeys(testchannels + random_channels)
+            for c in chdict.iterkeys():
+                chanresdict = OrderedDict()
                 # check that the channel is in the list of available channels
                 if (c in avail_channels) or not avail_check:
+                    chanresdict['available'] = avail_check or 'N.P.'
                     c = interf + ':' + c
                     # try to create an offline iterator with this connection and channel
                     self.logger.info("""Creating an offline iterator for channel {0} on server
@@ -132,15 +152,19 @@ class NdsTester(object):
                     except Exception as e:
                         self.logger.error("""Error {2} in creating the offline iterator for channel {0}
                          on server {1}, continuing the test.""".format(c, serv, e))
+                        chanresdict['OfflineIteratorCreation'] = False
+                        chanresdict['OfflineIterationTest'] = 'N.P.'
                     else:
                         # try to iterate on the offline iterator
-                        self.iterator_tester(iterator)
+                        chanresdict['OfflineIterationTest'] = self.iterator_tester(iterator)
                     self.logger.info('Proceeding with the test, resetting connection')
                     del connection
                     connection = self.connection_tester(interf, serv)
                     if isinstance(connection, Exception):
                         self.logger.error("""Error encountered in recreating the connection on server {0},
                          the test on this server will be interrupted""".format(serv))
+                        servresdict['connection'] = False
+                        servresdict[c] = chanresdict
                         break
                     self.logger.info("""Creating an online iterator for channel {0} on server
                      {1} using "conn.iterate({2}, [{0}])...""".format(c, serv, stride))
@@ -150,14 +174,22 @@ class NdsTester(object):
                     except Exception as e:
                         self.logger.error("""Error {2} in creating the online iterator for channel {0}
                          on server {1}, skipping channel.""".format(c, serv, e))
+                        chanresdict['OnlineIteratorCreation'] = False
+                        chanresdict['OnlineIterationTest'] = 'N.P'
                     else:
                         # try to iterate on the online iterator
-                        self.iterator_tester(iterator)
+                        chanresdict['OnlineIterationTest'] = self.iterator_tester(iterator)
                     self.logger.info('Proceeding with the test, resetting connection')
                     del connection
                     connection = self.connection_tester(interf, serv)
                     if isinstance(connection, Exception):
                         self.logger.error("""Error encountered in recreating the connection on server {0},
                          the test on this server will be interrupted""".format(serv))
+                        servresdict['connection'] = False
+                        servresdict[c] = chanresdict
                         break
+                servresdict[c] = chanresdict
+            resultdict[serv] = servresdict
+
         self.logger.success('Test complete!')
+        return resultdict
