@@ -17,7 +17,7 @@ class NdsTester(object):
             self.logger.info('Testing connection to server at {0} ({1})...'.format(ifo, s))
             try:
                 conn = nds2.connection(s)
-                self.logger.info('Connection establilished, printing details... \n {0}'.format(conn))
+                self.logger.success('Connection establilished, printing details... \n {0}'.format(conn))
             except:
                 self.logger.error("""Unable to open connection with server... \n {0},'
                                    the test will skip this server""".format(s))
@@ -28,7 +28,7 @@ class NdsTester(object):
         self.logger.info('Testing connection to server at {0} ({1})...'.format(ifo, s))
         try:
             conn = nds2.connection(s)
-            self.logger.info('Connection established, printing details... \n {0}'.format(conn))
+            self.logger.success('Connection established, printing details... \n {0}'.format(conn))
             return conn
         except Exception as e:
             self.logger.error('Unable to open connection with server... \n {0}, {1}'.format(s, e))
@@ -38,7 +38,7 @@ class NdsTester(object):
         self.logger.info('Checking available online channels for connection {0}...'.format(conn))
         try:
             achannels = conn.find_channels('*', nds2.channel.CHANNEL_TYPE_ONLINE)
-            self.logger.info('The available channels are {0}'.format(achannels))
+            self.logger.success('The available channels are {0}'.format(achannels))
             return achannels
         except Exception as e:
             self.logger.error('Unable to retrieve online channel list... \n {0}'.format(e))
@@ -48,7 +48,7 @@ class NdsTester(object):
         try:
             self.logger.info('Attempting to iterate on the generated iterator')
             data = next(it)
-            self.logger.info('Iteration success: data = {0}'. format(data))
+            self.logger.success('Iteration success: data = {0}'. format(data))
         except Exception as e:
             self.logger.error('Error {1} encountered while attempting to iterate on the iterator {0}'.format(it, e))
 
@@ -127,7 +127,7 @@ class NdsTester(object):
                      {1} using "conn.iterate({2}, {3}, {4}, [{0}])...""".format(c, serv, gpsb, gpse, stride))
                     try:
                         iterator = connection.iterate(gpsb, gpse, stride, [c])
-                        self.logger.info('Offline iterator for channel {0} on server {1} created.'.format(c, serv))
+                        self.logger.success('Offline iterator for channel {0} on server {1} created.'.format(c, serv))
                     except Exception as e:
                         self.logger.error("""Error {2} in creating the offline iterator for channel {0}
                          on server {1}, continuing the test.""".format(c, serv, e))
@@ -145,7 +145,7 @@ class NdsTester(object):
                      {1} using "conn.iterate({2}, [{0}])...""".format(c, serv, stride))
                     try:
                         iterator = connection.iterate(stride, [c])
-                        self.logger.info('Online iterator for channel {0} on server {1} created.'.format(c, serv))
+                        self.logger.success('Online iterator for channel {0} on server {1} created.'.format(c, serv))
                     except Exception as e:
                         self.logger.error("""Error {2} in creating the online iterator for channel {0}
                          on server {1}, skipping channel.""".format(c, serv, e))
@@ -159,4 +159,4 @@ class NdsTester(object):
                         self.logger.error("""Error encountered in recreating the connection on server {0},
                          the test on this server will be interrupted""".format(serv))
                         break
-        self.logger.info('Test complete!')
+        self.logger.success('Test complete!')

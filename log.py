@@ -37,7 +37,8 @@ COLORS = {
     'INFO': WHITE,
     'DEBUG': BLUE,
     'CRITICAL': RED,
-    'ERROR': RED
+    'ERROR': RED,
+    'SUCCESS': GREEN
 }
 
 
@@ -71,5 +72,8 @@ class Logger(logging.Logger):
         console = logging.StreamHandler()
         console.setFormatter(colorformatter)
         self.addHandler(console)
+        logging.SUCCESS = 25  # between WARNING and INFO
+        logging.addLevelName(logging.SUCCESS, 'SUCCESS')
+        setattr(self, 'success', lambda message, *args: self._log(logging.SUCCESS, message, args))
 
 logging.setLoggerClass(Logger)
