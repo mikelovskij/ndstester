@@ -3,6 +3,8 @@ from log import Logger
 from gwpy.time import tconvert
 from numpy.random import randint
 
+__author__ = 'mikelovskij'
+
 # TODO: implement a timeout routine?
 
 class NdsTester(object):
