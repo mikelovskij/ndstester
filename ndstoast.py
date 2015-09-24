@@ -38,8 +38,9 @@ class NdsTester(object):
         self.logger.info('Checking available online channels for connection {0}...'.format(conn))
         try:
             achannels = conn.find_channels('*', nds2.channel.CHANNEL_TYPE_ONLINE)
+            stringchannels = [c.name[3:] for c in achannels]
             self.logger.success('The available channels are {0}'.format(achannels))
-            return achannels
+            return stringchannels
         except Exception as e:
             self.logger.error('Unable to retrieve online channel list... \n {0}'.format(e))
             return e
